@@ -8,4 +8,5 @@ dependencies = [
     "fastapi>=0.120.1",
     "uvicorn[standard]>=0.32.0",
     "aiosqlite>=0.20.0",
+    "python-multipart>=0.0.9",
 ]

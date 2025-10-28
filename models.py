@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Literal
 from datetime import datetime
 from enum import Enum
 
@@ -33,18 +33,6 @@ class AlarmLevel(str, Enum):
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
-
-class ControlSwitch(str, Enum):
-    DAYTIME = "daytime"
-    GRID_CONNECTED = "grid_connected"
-    MARKET_ENABLED = "market_enabled"
-    BATTERY_RESERVE_PCT = "battery_reserve_pct"
-    MANUAL_LOAD_DELTA_KW = "manual_load_delta_kw"
-    SUN_CLOUD_FACTOR = "sun_cloud_factor"
-    EV_PLUG = "ev_plug"
-    EV_MODE = "ev_mode"
-    FAULT_INJECT = "fault_inject"
-    TIME_ACCELERATION = "time_acceleration"
 
 class OrderSide(str, Enum):
     SELL = "sell"
@@ -142,7 +130,7 @@ class MeterSnapshot(BaseModel):
 
 class ControlSwitchRequest(BaseModel):
     meter_id: str = Field(default="demo_meter", description="Meter identifier")
-    switch: ControlSwitch = Field(default=ControlSwitch.DAYTIME, description="Control switch to adjust")
+    switch: Literal["daytime", "grid_connected", "market_enabled", "battery_reserve_pct", "manual_load_delta_kw", "sun_cloud_factor", "ev_plug", "ev_mode", "fault_inject", "time_acceleration"] = Field(default="daytime", description="Control switch to adjust", examples=["daytime", "grid_connected", "market_enabled"])
     value: float | bool | Dict | str = Field(default=True, description="New value for the switch (type depends on switch)")
 
 class MarketOrderRequest(BaseModel):

@@ -1,12 +1,12 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Form
 from contextlib import asynccontextmanager
 import asyncio
-from typing import List
+from typing import List, Literal
 from datetime import datetime
 
 from simulator import Simulator
 from models import (
-    MeterSnapshot, ControlSwitchRequest, MarketOrderRequest, MarketOrderResponse,
+    MeterSnapshot, MarketOrderRequest, MarketOrderResponse,
     OrderStatus, HealthResponse, TimeseriesResponse, EventsResponse,
     ControlResponse, CancelResponse, ConstantsResponse
 )
@@ -111,7 +111,11 @@ async def get_timeseries(meter_id: str, start: str = Query(...), end: str = Quer
         return {"data": filtered}
 
 @app.post("/api/v1/control/switch", response_model=ControlResponse)
-async def control_switch(request: ControlSwitchRequest):
+async def control_switch(
+    meter_id: str = Form(default="demo_meter", description="Meter identifier"),
+    switch: Literal["daytime", "grid_connected", "market_enabled", "battery_reserve_pct", "manual_load_delta_kw", "sun_cloud_factor", "ev_plug", "ev_mode", "fault_inject", "time_acceleration"] = Form(..., description="Control switch to adjust"),
+    value: str = Form(..., description="New value for the switch (as string, parsed based on switch type)")
+):
     """
     Control simulation knobs and switches.
 
@@ -119,44 +123,74 @@ async def control_switch(request: ControlSwitchRequest):
     Changes take effect immediately in the next simulation tick.
 
     Supported switches:
-    - **daytime** (bool): Enable/disable PV generation (solar irradiance curve)
-    - **grid_connected** (bool): Connect/disconnect from grid (affects import/export)
-    - **market_enabled** (bool): Enable/disable marketplace trading
-    - **battery_reserve_pct** (float): Minimum SoC reserve (0-100%)
-    - **manual_load_delta_kw** (float): Add/subtract load for testing spikes
-    - **sun_cloud_factor** (float): Multiplier for PV irradiance (0-1, simulates clouds)
-    - **ev_plug** (bool): Plug/unplug EV charger
-    - **ev_mode** (str): EV charging mode ("off", "fast", "scheduled")
-    - **fault_inject** (dict): Inject sensor faults (bias_pct, spike_prob, dropout_prob)
-    - **time_acceleration** (float): Simulation speed multiplier (1.0 = real-time)
+    - **daytime** (bool): Enable/disable PV generation (solar irradiance curve) - use 'true'/'false'
+    - **grid_connected** (bool): Connect/disconnect from grid (affects import/export) - use 'true'/'false'
+    - **market_enabled** (bool): Enable/disable marketplace trading - use 'true'/'false'
+    - **battery_reserve_pct** (float): Minimum SoC reserve (0-100%) - use number as string
+    - **manual_load_delta_kw** (float): Add/subtract load for testing spikes - use number as string
+    - **sun_cloud_factor** (float): Multiplier for PV irradiance (0-1, simulates clouds) - use number as string
+    - **ev_plug** (bool): Plug/unplug EV charger - use 'true'/'false'
+    - **ev_mode** (str): EV charging mode ("off", "fast", "scheduled") - use exact string
+    - **fault_inject** (dict): Inject sensor faults (bias_pct, spike_prob, dropout_prob) - use JSON string
+    - **time_acceleration** (float): Simulation speed multiplier (1.0 = real-time) - use number as string
 
     - **meter_id**: Must match the simulator's meter ID
     - **switch**: Name of the control to adjust
-    - **value**: New value for the switch
+    - **value**: New value for the switch (strictly enforced by type)
     """
-    if request.meter_id != simulator.meter_id:
+    if meter_id != simulator.meter_id:
         raise HTTPException(status_code=404, detail="Meter not found")
+    
+    # Parse value based on switch type
+    if switch in ["daytime", "grid_connected", "market_enabled", "ev_plug"]:
+        if value not in ["true", "false"]:
+            raise HTTPException(status_code=400, detail=f"Value for {switch} must be 'true' or 'false'")
+        parsed_value = value == "true"
+    elif switch in ["battery_reserve_pct", "manual_load_delta_kw", "sun_cloud_factor", "time_acceleration"]:
+        try:
+            parsed_value = float(value)
+            if switch == "battery_reserve_pct" and not (0 <= parsed_value <= 100):
+                raise HTTPException(status_code=400, detail="battery_reserve_pct must be between 0 and 100")
+            if switch == "sun_cloud_factor" and not (0 <= parsed_value <= 1):
+                raise HTTPException(status_code=400, detail="sun_cloud_factor must be between 0 and 1")
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Value for {switch} must be a valid number")
+    elif switch == "ev_mode":
+        if value not in ["off", "fast", "scheduled"]:
+            raise HTTPException(status_code=400, detail="ev_mode must be 'off', 'fast', or 'scheduled'")
+        parsed_value = value
+    elif switch == "fault_inject":
+        try:
+            import json
+            parsed_value = json.loads(value)
+            if not isinstance(parsed_value, dict):
+                raise HTTPException(status_code=400, detail="fault_inject must be a JSON object")
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="fault_inject must be valid JSON")
+    else:
+        raise HTTPException(status_code=400, detail="Unknown switch")
+    
     async with lock:
-        if request.switch == "daytime":
-            simulator.daytime = bool(request.value)
-        elif request.switch == "grid_connected":
-            simulator.grid_connected = bool(request.value)
-        elif request.switch == "market_enabled":
-            simulator.market_enabled = bool(request.value)
-        elif request.switch == "battery_reserve_pct":
-            simulator.battery_reserve_pct = float(request.value)
-        elif request.switch == "manual_load_delta_kw":
-            simulator.manual_load_delta_kw = float(request.value)
-        elif request.switch == "sun_cloud_factor":
-            simulator.sun_cloud_factor = float(request.value)
-        elif request.switch == "ev_plug":
-            simulator.ev_plugged = bool(request.value)
-        elif request.switch == "ev_mode":
-            simulator.ev_mode = str(request.value)
-        elif request.switch == "fault_inject":
-            simulator.fault_inject = dict(request.value)
-        elif request.switch == "time_acceleration":
-            simulator.time_acceleration = float(request.value)
+        if switch == "daytime":
+            simulator.daytime = bool(parsed_value)
+        elif switch == "grid_connected":
+            simulator.grid_connected = bool(parsed_value)
+        elif switch == "market_enabled":
+            simulator.market_enabled = bool(parsed_value)
+        elif switch == "battery_reserve_pct":
+            simulator.battery_reserve_pct = float(parsed_value)
+        elif switch == "manual_load_delta_kw":
+            simulator.manual_load_delta_kw = float(parsed_value)
+        elif switch == "sun_cloud_factor":
+            simulator.sun_cloud_factor = float(parsed_value)
+        elif switch == "ev_plug":
+            simulator.ev_plugged = bool(parsed_value)
+        elif switch == "ev_mode":
+            simulator.ev_mode = str(parsed_value)
+        elif switch == "fault_inject":
+            simulator.fault_inject = dict(parsed_value)
+        elif switch == "time_acceleration":
+            simulator.time_acceleration = float(parsed_value)
         else:
             raise HTTPException(status_code=400, detail="Unknown switch")
     return {"status": "ok"}
