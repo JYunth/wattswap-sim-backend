@@ -1,0 +1,8 @@
+.git
+.gitignore
+.python-version
+.venv
+__pycache__
+README.md
+.dockerignore
+Dockerfile
