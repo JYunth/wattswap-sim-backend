@@ -125,13 +125,14 @@ class Simulator:
         trade_sell_kw = 0.0
         trade_buy_kw = 0.0
         for order in self.active_orders:
-            if order['side'] == 'sell':
-                # Calculate required power
-                remaining = order['quantity_kwh'] - order.get('filled_kwh', 0)
-                if remaining > 0:
+            remaining = order['quantity_kwh'] - order.get('filled_kwh', 0)
+            if remaining > 0:
+                if order['side'] == 'sell':
                     p_trade = min(self.P_MAX_DISCHARGE, remaining / (order['duration_sec'] / 3600))
                     trade_sell_kw += p_trade
-            # Similar for buy, but for now focus on sell
+                elif order['side'] == 'buy':
+                    p_trade = min(self.P_MAX_CHARGE, remaining / (order['duration_sec'] / 3600))
+                    trade_buy_kw += p_trade
 
         # Battery scheduling
         available_charge = min(self.P_MAX_CHARGE, (self.BATTERY_CAPACITY_KWH - self.soc_kwh) / (dt / 3600) / self.EFFICIENCY_ROUNDTRIP)
@@ -156,6 +157,9 @@ class Simulator:
         if trade_sell_kw > 0:
             additional_discharge = min(trade_sell_kw, available_discharge - abs(battery_power_kw))
             battery_power_kw += additional_discharge
+        if trade_buy_kw > 0:
+            additional_charge = min(trade_buy_kw, available_charge - abs(battery_power_kw))
+            battery_power_kw -= additional_charge  # negative for charge
 
         self.battery_power_kw = battery_power_kw
 
@@ -189,13 +193,16 @@ class Simulator:
 
         # Update orders
         for order in self.active_orders[:]:
+            filled_this_tick = 0
             if order['side'] == 'sell':
                 filled_this_tick = self.battery_power_kw * dt / 3600 if self.battery_power_kw > 0 else 0
-                order['filled_kwh'] = order.get('filled_kwh', 0) + filled_this_tick
-                if order['filled_kwh'] >= order['quantity_kwh']:
-                    order['status'] = 'executed'
-                    self.active_orders.remove(order)
-                    self.events.append({'type': 'order_executed', 'order_id': order['order_id'], 'timestamp': self.current_time.isoformat()})
+            elif order['side'] == 'buy':
+                filled_this_tick = -self.battery_power_kw * dt / 3600 if self.battery_power_kw < 0 else 0  # charging power
+            order['filled_kwh'] = order.get('filled_kwh', 0) + filled_this_tick
+            if order['filled_kwh'] >= order['quantity_kwh']:
+                order['status'] = 'executed'
+                self.active_orders.remove(order)
+                self.events.append({'type': 'order_executed', 'order_id': order['order_id'], 'timestamp': self.current_time.isoformat()})
 
         # Add noise
         noise_sigma = self.fault_inject.get('sigma_pct', 0.01)
