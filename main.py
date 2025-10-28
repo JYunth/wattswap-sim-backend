@@ -7,7 +7,8 @@ from datetime import datetime
 from simulator import Simulator
 from models import (
     MeterSnapshot, ControlSwitchRequest, MarketOrderRequest, MarketOrderResponse,
-    OrderStatus, HealthResponse
+    OrderStatus, HealthResponse, TimeseriesResponse, EventsResponse,
+    ControlResponse, CancelResponse
 )
 
 simulator = Simulator("demo_meter")
@@ -70,7 +71,7 @@ async def get_snapshot(meter_id: str):
     async with lock:
         return simulator.latest_snapshot
 
-@app.get("/api/v1/meter/{meter_id}/timeseries")
+@app.get("/api/v1/meter/{meter_id}/timeseries", response_model=TimeseriesResponse)
 async def get_timeseries(meter_id: str, start: str = Query(...), end: str = Query(...), resolution: str = "1s"):
     """
     Retrieve historical timeseries data for the meter.
@@ -93,7 +94,7 @@ async def get_timeseries(meter_id: str, start: str = Query(...), end: str = Quer
         # For simplicity, return all, downsample if needed
         return {"data": filtered}
 
-@app.post("/api/v1/control/switch")
+@app.post("/api/v1/control/switch", response_model=ControlResponse)
 async def control_switch(request: ControlSwitchRequest):
     """
     Control simulation knobs and switches.
@@ -204,7 +205,7 @@ async def get_order_status(order_id: str):
         raise HTTPException(status_code=404, detail="Order not found")
     return status
 
-@app.post("/api/v1/market/cancel")
+@app.post("/api/v1/market/cancel", response_model=CancelResponse)
 async def cancel_order(order_id: str):
     """
     Cancel a pending market order.
@@ -240,7 +241,7 @@ async def get_health():
             queue_lengths={"orders": len(simulator.active_orders)}
         )
 
-@app.get("/api/v1/events")
+@app.get("/api/v1/events", response_model=EventsResponse)
 async def get_events(limit: int = 50):
     """
     Get recent simulation events and order executions.

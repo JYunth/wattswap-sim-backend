@@ -7,7 +7,8 @@ from collections import deque
 
 from models import (
     MeterSnapshot, Measurements, PVState, BatteryState, LoadState, GridState,
-    DerivedState, MarketState, Alarm, MarketOrderRequest, OrderStatus
+    DerivedState, MarketState, Alarm, MarketOrderRequest, OrderStatus,
+    FlowDirection, PVStatus, BMSStatus, LoadProfile, GridStatus, AlarmLevel
 )
 
 class Simulator:
@@ -202,7 +203,7 @@ class Simulator:
         self.timeseries.append(snapshot)
 
     def get_snapshot(self, v_rms, i_rms, p_active) -> MeterSnapshot:
-        flow_dir = 'export' if p_active > 0 else 'import' if p_active < 0 else 'idle'
+        flow_dir = FlowDirection.EXPORT if p_active > 0 else FlowDirection.IMPORT if p_active < 0 else FlowDirection.IDLE
         apparent_power = math.sqrt(p_active**2 + 0.02**2)  # assume q=0.02
         power_factor = p_active / apparent_power if apparent_power > 0 else 1.0
 
@@ -221,7 +222,7 @@ class Simulator:
             pv_power_kw=self.pv_power_kw,
             pv_irradiance_wpm2=self.MAX_IRRADIANCE * self.daylight_curve(self.current_time) * self.sun_cloud_factor,
             pv_temp_c=self.BATTERY_TEMP_C,
-            pv_status='on' if self.daytime else 'standby',
+            pv_status=PVStatus.ON if self.daytime else PVStatus.STANDBY,
             mppt_setpoint_kw=self.PV_CAPACITY_KW
         )
 
@@ -234,18 +235,18 @@ class Simulator:
             available_discharge_kwh=(self.soc_kwh - self.BATTERY_CAPACITY_KWH * self.battery_reserve_pct / 100) * self.EFFICIENCY_ROUNDTRIP,
             p_max_charge_kw=self.P_MAX_CHARGE,
             p_max_discharge_kw=self.P_MAX_DISCHARGE,
-            bms_status='idle' if self.battery_power_kw == 0 else ('charging' if self.battery_power_kw < 0 else 'discharging'),
+            bms_status=BMSStatus.IDLE if self.battery_power_kw == 0 else (BMSStatus.CHARGING if self.battery_power_kw < 0 else BMSStatus.DISCHARGING),
             efficiency_roundtrip=self.EFFICIENCY_ROUNDTRIP
         )
 
         loads = LoadState(
             load_power_kw=self.load_kw,
             appliance={'hvac_kw': 1.1, 'ev_charger_kw': 3.0 if self.ev_plugged and self.ev_mode == 'fast' else 0.0, 'fridge_kw': 0.15, 'lighting_kw': 0.2},
-            load_profile='spiky'
+            load_profile=LoadProfile.SPIKY
         )
 
         grid = GridState(
-            grid_status='connected' if self.grid_connected else 'islanded',
+            grid_status=GridStatus.CONNECTED if self.grid_connected else GridStatus.ISLAND,
             grid_price_currency_per_kwh=self.GRID_PRICE,
             grid_available_capacity_kw=5.0
         )
