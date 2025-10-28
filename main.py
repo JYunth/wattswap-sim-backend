@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Query, Form
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
 from typing import List, Literal, Union, Dict
@@ -52,6 +53,15 @@ app = FastAPI(
     """,
     version="1.0.0",
     lifespan=lifespan
+)
+
+# Add CORS middleware to allow all origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
 )
 
 @app.get("/api/v1/meter/{meter_id}/snapshot", response_model=MeterSnapshot)
