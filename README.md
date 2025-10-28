@@ -32,6 +32,8 @@ docker run -p 8000:8000 wattswap-sim-backend
 - GET /api/v1/meter/{meter_id}/snapshot - Current snapshot
 - GET /api/v1/meter/{meter_id}/timeseries?start=ISO&end=ISO - Timeseries data
 - POST /api/v1/control/switch - Control knobs
+- GET /api/v1/control/switches - Get all switch statuses
+- GET /api/v1/control/time_acceleration - Get time acceleration
 - POST /api/v1/market/order - Place market order
 - GET /api/v1/market/order/{order_id} - Order status
 - POST /api/v1/market/cancel - Cancel order

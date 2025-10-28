@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Query, Form
 from contextlib import asynccontextmanager
 import asyncio
-from typing import List, Literal
+from typing import List, Literal, Union, Dict
 from datetime import datetime
 
 from simulator import Simulator
@@ -194,6 +194,40 @@ async def control_switch(
         else:
             raise HTTPException(status_code=400, detail="Unknown switch")
     return {"status": "ok"}
+
+@app.get("/api/v1/control/time_acceleration")
+async def get_time_acceleration():
+    """
+    Get the current time acceleration factor.
+
+    Returns the simulation speed multiplier (1.0 = real-time).
+    Useful for monitoring simulation performance.
+
+    - **Returns**: Current time acceleration value
+    """
+    async with lock:
+        return {"time_acceleration": simulator.time_acceleration}
+    """
+    Get the current status of all control switches.
+
+    Returns the current values of all simulator control knobs and switches.
+    Useful for UI state synchronization and debugging.
+
+    - **Returns**: Dictionary with switch names as keys and their current values
+    """
+    async with lock:
+        return {
+            "daytime": simulator.daytime,
+            "grid_connected": simulator.grid_connected,
+            "market_enabled": simulator.market_enabled,
+            "battery_reserve_pct": simulator.battery_reserve_pct,
+            "manual_load_delta_kw": simulator.manual_load_delta_kw,
+            "sun_cloud_factor": simulator.sun_cloud_factor,
+            "ev_plug": simulator.ev_plugged,
+            "ev_mode": simulator.ev_mode,
+            "fault_inject": simulator.fault_inject,
+            "time_acceleration": simulator.time_acceleration,
+        }
 
 @app.post("/api/v1/market/order", response_model=MarketOrderResponse)
 async def create_order(request: MarketOrderRequest):
