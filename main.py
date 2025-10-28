@@ -8,7 +8,7 @@ from simulator import Simulator
 from models import (
     MeterSnapshot, ControlSwitchRequest, MarketOrderRequest, MarketOrderResponse,
     OrderStatus, HealthResponse, TimeseriesResponse, EventsResponse,
-    ControlResponse, CancelResponse
+    ControlResponse, CancelResponse, ConstantsResponse
 )
 
 simulator = Simulator("demo_meter")
@@ -62,6 +62,16 @@ async def get_snapshot(meter_id: str):
     This endpoint returns the latest instantaneous measurements, PV status, battery state,
     load information, grid connection details, derived analytics, and current market state.
 
+    Includes:
+    - **Measurements**: Voltage, current, power, frequency, power factor, flow direction, THD voltage
+    - **PV State**: Power output, irradiance, temperature, status
+    - **Battery State**: SoC, power, voltage, current, charge/discharge limits, status
+    - **Load State**: Total power, appliance breakdown, profile type
+    - **Grid State**: Connection status, pricing, capacity
+    - **Derived Analytics**: Net power, self-consumption, autonomy, cumulative energies, CO2 savings, token earnings, system status
+    - **Market State**: Pending orders, market price, last trade
+    - **Alarms**: Active system alerts
+
     - **meter_id**: Unique identifier for the meter (currently "demo_meter")
     - **Returns**: Complete meter snapshot with all hardware and derived signals
     - **Updates**: At 1Hz simulation rate, reflecting live state changes
@@ -78,6 +88,12 @@ async def get_timeseries(meter_id: str, start: str = Query(...), end: str = Quer
 
     Returns an array of snapshots between the specified start and end times.
     Data is stored in a ring buffer (last 1 hour at 1Hz).
+
+    Each snapshot includes complete meter data:
+    - **Measurements**: Voltage, current, power, frequency, power factor, flow direction, THD voltage
+    - **PV/Battery/Load/Grid States**: All current status and parameters
+    - **Derived Analytics**: Net power, self-consumption, autonomy, cumulative energies, CO2 savings, token earnings
+    - **Market & Alarms**: Trading activity and system alerts
 
     - **meter_id**: Unique identifier for the meter
     - **start**: ISO8601 timestamp for start of range (e.g., "2025-10-29T10:00:00")
@@ -240,6 +256,16 @@ async def get_health():
             time_acceleration=simulator.time_acceleration,
             queue_lengths={"orders": len(simulator.active_orders)}
         )
+
+@app.get("/api/v1/constants", response_model=ConstantsResponse)
+async def get_constants():
+    """
+    Get frontend configuration constants.
+
+    Provides values for CO2 factor, token rate, and refresh intervals
+    used by the dashboard for calculations and polling.
+    """
+    return ConstantsResponse()
 
 @app.get("/api/v1/events", response_model=EventsResponse)
 async def get_events(limit: int = 50):

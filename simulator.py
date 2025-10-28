@@ -47,6 +47,8 @@ class Simulator:
         self.energy_exported = 0.0
         self.pv_energy = 0.0
         self.unserved_load_kw = 0.0
+        self.co2_savings = 0.0
+        self.token_earnings = 0.0
 
         # Knobs
         self.daytime = False
@@ -177,9 +179,13 @@ class Simulator:
                 self.unserved_load_kw = -net_power - 5.0
 
         # Update counters
-        self.energy_imported += self.grid_import_kw * dt / 3600
-        self.energy_exported += self.grid_export_kw * dt / 3600
+        delta_import = self.grid_import_kw * dt / 3600
+        delta_export = self.grid_export_kw * dt / 3600
+        self.energy_imported += delta_import
+        self.energy_exported += delta_export
         self.pv_energy += self.pv_power_kw * dt / 3600
+        self.co2_savings += delta_export * 0.45
+        self.token_earnings += delta_export * 0.08
 
         # Update orders
         for order in self.active_orders[:]:
@@ -215,7 +221,8 @@ class Simulator:
             apparent_power=apparent_power,
             frequency=self.GRID_FREQUENCY + random.gauss(0, 0.1),
             power_factor=power_factor,
-            flow_dir=flow_dir
+            flow_dir=flow_dir,
+            thd_voltage_pct=2.5 + random.gauss(0, 0.5)
         )
 
         pv = PVState(
@@ -262,7 +269,13 @@ class Simulator:
             self_consumption_pct=self_consumption / self.pv_power_kw * 100 if self.pv_power_kw > 0 else 0,
             autonomy_hours=autonomy_hours,
             time_to_full_hours=time_to_full,
-            time_to_empty_hours=time_to_empty
+            time_to_empty_hours=time_to_empty,
+            energy_imported_kwh=self.energy_imported,
+            energy_exported_kwh=self.energy_exported,
+            co2_savings_kg=self.co2_savings,
+            token_earnings_apt=self.token_earnings,
+            system_status="All systems operational",
+            status_badge="Online"
         )
 
         market = MarketState(

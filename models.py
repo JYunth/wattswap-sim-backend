@@ -70,6 +70,7 @@ class Measurements(BaseModel):
     frequency: float
     power_factor: float
     flow_dir: FlowDirection
+    thd_voltage_pct: float = Field(default=2.5, description="Total Harmonic Distortion in voltage")
 
 class PVState(BaseModel):
     pv_power_kw: float
@@ -106,6 +107,12 @@ class DerivedState(BaseModel):
     autonomy_hours: Optional[float]
     time_to_full_hours: Optional[float]
     time_to_empty_hours: Optional[float]
+    energy_imported_kwh: float = Field(description="Cumulative energy imported from grid")
+    energy_exported_kwh: float = Field(description="Cumulative energy exported to grid")
+    co2_savings_kg: float = Field(description="Cumulative CO2 savings from exports")
+    token_earnings_apt: float = Field(description="Cumulative token earnings from exports")
+    system_status: str = Field(default="All systems operational", description="Overall system status")
+    status_badge: str = Field(default="Online", description="Status badge text")
 
 class MarketState(BaseModel):
     pending_orders: int
@@ -177,3 +184,8 @@ class ControlResponse(BaseModel):
 
 class CancelResponse(BaseModel):
     status: str = Field(default="cancelled", description="Cancellation status")
+
+class ConstantsResponse(BaseModel):
+    co2_factor: float = Field(default=0.45, description="kg CO₂ per kWh")
+    token_rate: float = Field(default=0.08, description="APT per kWh")
+    refresh_interval_ms: int = Field(default=5000, description="Frontend refresh interval")
